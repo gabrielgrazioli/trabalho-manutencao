@@ -104,16 +104,8 @@ class RecurringTransaction(models.Model):
             date = self.date
         while True:
             date += delta
-            if self.usual_month_day > 0 and self.interval not in [self.WEEKLY, self.DAILY]:
-                day = self.usual_month_day
-                while True:
-                    try:
-                        date = date.replace(day=day)
-                        break
-                    except ValueError:
-                        day -= 1
-                        pass
-            if date.weekday() > 4 and self.interval not in [self.WEEKLY, self.DAILY]:
+            date = self._with_usual_month_day(date)
+            if date.weekday() > 4 and self._follows_calendar_rules:
                 if self.weekend_handling == self.SKIP:
                     continue
                 elif self.weekend_handling == self.NEXT_WEEKDAY:
@@ -125,12 +117,28 @@ class RecurringTransaction(models.Model):
                 self.save()
             return date
 
+    @property
+    def _follows_calendar_rules(self):
+        """Only monthly or longer intervals use usual_month_day and weekend handling."""
+        return self.interval not in (self.WEEKLY, self.DAILY)
+
     def _get_delta(self):
         """Interval between two occurrences, or None if the recurrence is disabled."""
         delta_args = self.INTERVAL_DELTAS.get(self.interval)
         if delta_args is None:
             return None
         return relativedelta(**delta_args) * self.multiplier
+
+    def _with_usual_month_day(self, candidate):
+        """Moves candidate to usual_month_day, using the month's last day if it is shorter."""
+        if self.usual_month_day <= 0 or not self._follows_calendar_rules:
+            return candidate
+        day = self.usual_month_day
+        while True:
+            try:
+                return candidate.replace(day=day)
+            except ValueError:
+                day -= 1
 
     @property
     def is_disabled(self):
