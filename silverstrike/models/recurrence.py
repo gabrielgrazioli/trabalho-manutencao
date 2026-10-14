@@ -52,6 +52,16 @@ class RecurringTransaction(models.Model):
         (NEXT_WEEKDAY, _('Next weekday'))
     )
 
+    # Quanto avançar a data em cada intervalo (multiplicado por `multiplier`)
+    INTERVAL_DELTAS = {
+        MONTHLY: {'months': 1},
+        QUARTERLY: {'months': 3},
+        BIANNUALLY: {'months': 6},
+        ANNUALLY: {'years': 1},
+        WEEKLY: {'weeks': 1},
+        DAILY: {'days': 1},
+    }
+
     class Meta:
         ordering = ['date']
 
@@ -87,24 +97,11 @@ class RecurringTransaction(models.Model):
         Calculates the date to the next occurence and optionally saves it.
         It uses the usual_month_day if set for setting the correct day in a monthly recurrence
         """
-        delta = None
+        delta = self._get_delta()
+        if delta is None:
+            return
         if not date:
             date = self.date
-        if self.interval == self.MONTHLY:
-            delta = relativedelta(months=1)
-        elif self.interval == self.QUARTERLY:
-            delta = relativedelta(months=3)
-        elif self.interval == self.BIANNUALLY:
-            delta = relativedelta(months=6)
-        elif self.interval == self.ANNUALLY:
-            delta = relativedelta(years=1)
-        elif self.interval == self.WEEKLY:
-            delta = relativedelta(weeks=1)
-        elif self.interval == self.DAILY:
-            delta = relativedelta(days=1)
-        else:
-            return
-        delta *= self.multiplier
         while True:
             date += delta
             if self.usual_month_day > 0 and self.interval not in [self.WEEKLY, self.DAILY]:
@@ -127,6 +124,13 @@ class RecurringTransaction(models.Model):
                 self.date = date
                 self.save()
             return date
+
+    def _get_delta(self):
+        """Interval between two occurrences, or None if the recurrence is disabled."""
+        delta_args = self.INTERVAL_DELTAS.get(self.interval)
+        if delta_args is None:
+            return None
+        return relativedelta(**delta_args) * self.multiplier
 
     @property
     def is_disabled(self):
