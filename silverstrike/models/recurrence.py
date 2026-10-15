@@ -94,6 +94,24 @@ class RecurringTransaction(models.Model):
     def is_due(self):
         return date.today() >= self.date
 
+    # -------------------------------------------------------------------------
+    # MANUTENÇÃO (Etapa 5) - PROBLEMA 1: Long Method / Conditional Complexity
+    # Local: RecurringTransaction.update_date.
+    # Evidência (antes): complexidade 19 no radon (nota C): cadeia de if/elif com
+    #   6 ramos para escolher o intervalo, dois "while True" aninhados, a condição
+    #   "interval not in [WEEKLY, DAILY]" repetida duas vezes e números mágicos
+    #   (4 e 7).
+    # Consequência: para mudar uma regra (intervalo, dia usual ou fim de semana) era
+    #   preciso entender tudo de uma vez, e os casos semanal, diário, multiplicador
+    #   e fim de semana não tinham testes.
+    # Refatoração: Extract Method (_get_delta, _with_usual_month_day, _is_weekend,
+    #   _is_skipped_weekend e _shift_weekend), propriedade _follows_calendar_rules,
+    #   tabela INTERVAL_DELTAS e constantes FRIDAY e DAYS_IN_WEEK.
+    # Depois: complexidade 6 (nota B). A assinatura e o retorno não mudaram.
+    # Preservação do comportamento: tests/models/test_recurrence_update_date.py e
+    #   tests/models/test_recurrences.py.
+    # Código original: commit dd58f44 (git diff dd58f44 -- silverstrike/models/recurrence.py).
+    # -------------------------------------------------------------------------
     def update_date(self, date=None, save=False):
         """
         Calculates the date to the next occurence and optionally saves it.
@@ -102,18 +120,16 @@ class RecurringTransaction(models.Model):
         delta = self._get_delta()
         if delta is None:
             return
-        if not date:
-            date = self.date
+        candidate = date or self.date
         while True:
-            date += delta
-            date = self._with_usual_month_day(date)
-            if self._is_skipped_weekend(date):
-                continue
-            date = self._shift_weekend(date)
-            if save:
-                self.date = date
-                self.save()
-            return date
+            candidate = self._with_usual_month_day(candidate + delta)
+            if not self._is_skipped_weekend(candidate):
+                break
+        result = self._shift_weekend(candidate)
+        if save:
+            self.date = result
+            self.save()
+        return result
 
     @property
     def _follows_calendar_rules(self):
