@@ -13,6 +13,20 @@ from silverstrike.models import Account, RecurringTransaction, Split, Transactio
 class IndexView(LoginRequiredMixin, generic.TemplateView):
     template_name = 'silverstrike/index.html'
 
+    # -------------------------------------------------------------------------
+    # MANUTENÇÃO (Etapa 4) - PROBLEMA 3 IDENTIFICADO: Duplicated Code / Long Method
+    # (identificado e documentado, não refatorado nesta entrega)
+    # Local: IndexView.get_context_data (complexidade 12 no radon, nota C).
+    # Evidência: a expressão
+    #   queryset.aggregate(models.Sum('amount'))['amount__sum'] or 0
+    #   aparece 5 vezes (4 delas dentro de abs) para somar o saldo, a receita e a
+    #   despesa do mês atual e do mês anterior.
+    # Consequência: qualquer mudança no cálculo dos totais precisa ser repetida em
+    #   5 pontos, e os testes de receita e despesa (test_income e test_expenses em
+    #   tests/views/test_IndexView.py) estão vazios, só com "pass".
+    # Tratamento possível: Extract Method (um método que soma o valor e outro que
+    #   devolve receita e despesa de um conjunto de splits).
+    # -------------------------------------------------------------------------
     def get_context_data(self, **kwargs):
         dstart = date.today().replace(day=1)
         dend = last_day_of_month(dstart)
