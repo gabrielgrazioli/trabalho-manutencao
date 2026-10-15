@@ -61,6 +61,8 @@ class RecurringTransaction(models.Model):
         WEEKLY: {'weeks': 1},
         DAILY: {'days': 1},
     }
+    FRIDAY = 4  # date.weekday(): segunda=0 ... sexta=4, sábado=5, domingo=6
+    DAYS_IN_WEEK = 7
 
     class Meta:
         ordering = ['date']
@@ -105,13 +107,9 @@ class RecurringTransaction(models.Model):
         while True:
             date += delta
             date = self._with_usual_month_day(date)
-            if date.weekday() > 4 and self._follows_calendar_rules:
-                if self.weekend_handling == self.SKIP:
-                    continue
-                elif self.weekend_handling == self.NEXT_WEEKDAY:
-                    date += relativedelta(days=7 - date.weekday())
-                elif self.weekend_handling == self.PREVIOUS_WEEKDAY:
-                    date -= relativedelta(days=date.weekday() - 4)
+            if self._is_skipped_weekend(date):
+                continue
+            date = self._shift_weekend(date)
             if save:
                 self.date = date
                 self.save()
@@ -139,6 +137,22 @@ class RecurringTransaction(models.Model):
                 return candidate.replace(day=day)
             except ValueError:
                 day -= 1
+
+    def _is_weekend(self, candidate):
+        return self._follows_calendar_rules and candidate.weekday() > self.FRIDAY
+
+    def _is_skipped_weekend(self, candidate):
+        return self._is_weekend(candidate) and self.weekend_handling == self.SKIP
+
+    def _shift_weekend(self, candidate):
+        """Moves a weekend candidate to the next or previous weekday, if so configured."""
+        if not self._is_weekend(candidate):
+            return candidate
+        if self.weekend_handling == self.NEXT_WEEKDAY:
+            return candidate + relativedelta(days=self.DAYS_IN_WEEK - candidate.weekday())
+        if self.weekend_handling == self.PREVIOUS_WEEKDAY:
+            return candidate - relativedelta(days=candidate.weekday() - self.FRIDAY)
+        return candidate
 
     @property
     def is_disabled(self):
