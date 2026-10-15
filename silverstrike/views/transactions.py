@@ -1,9 +1,11 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views import generic
 
-from silverstrike.forms import DepositForm, TransactionFormSet, TransferForm, WithdrawForm
+from silverstrike.forms import (DepositForm, TransactionFormSet, TransactionSearchForm,
+                                TransferForm, WithdrawForm)
 from silverstrike.models import AccountType, Split, Transaction
 
 
@@ -32,6 +34,7 @@ class TransactionIndex(LoginRequiredMixin, generic.ListView):
     context_object_name = 'transactions'
     model = Split
     paginate_by = 50
+    FILTER_PARAMS = ('category', 'recurrence', 'account', 'opposing_account')
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(account__account_type=AccountType.PERSONAL)
@@ -46,12 +49,32 @@ class TransactionIndex(LoginRequiredMixin, generic.ListView):
             queryset = queryset.filter(opposing_account_id=self.request.GET['opposing_account'])
         else:
             queryset = queryset.transfers_once()
+
+        # Busca por texto e período: campos inválidos ficam fora de cleaned_data e são ignorados
+        self.search_form = TransactionSearchForm(self.request.GET)
+        self.search_form.is_valid()
+        search = self.search_form.cleaned_data
+        if search.get('q'):
+            queryset = queryset.filter(
+                Q(transaction__title__icontains=search['q']) | Q(title__icontains=search['q']))
+        if search.get('start'):
+            queryset = queryset.filter(date__gte=search['start'])
+        if search.get('end'):
+            queryset = queryset.filter(date__lte=search['end'])
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['menu'] = 'transactions'
         context['submenu'] = 'all'
+        context['search_form'] = self.search_form
+        # parâmetros da URL sem a página, para a paginação manter a busca e os filtros
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        context['querystring'] = params.urlencode()
+        context['active_filters'] = [
+            (name, self.request.GET[name]) for name in self.FILTER_PARAMS
+            if name in self.request.GET]
         return context
 
 

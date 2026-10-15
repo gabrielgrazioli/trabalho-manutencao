@@ -265,4 +265,10 @@ class ExportForm(forms.Form):
         queryset=models.Account.objects.personal())
 
 
+class TransactionSearchForm(forms.Form):
+    q = forms.CharField(required=False)
+    start = forms.DateField(required=False)
+    end = forms.DateField(required=False)
+
+
 CategoryAssignFormset = forms.modelformset_factory(models.Split, fields=('category',), extra=0)
