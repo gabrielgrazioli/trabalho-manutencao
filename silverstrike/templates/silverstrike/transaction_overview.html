@@ -18,6 +18,23 @@
   <h3 class="box-title">{% trans 'Transaction list' %}</h3>
 </div>
 <div class="box-body">
+<form method="get" action="{{ request.path }}" class="form-inline" style="margin-bottom: 15px;">
+  {% for name, value in active_filters %}<input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+  <div class="form-group">
+    <input type="text" name="q" class="form-control" placeholder="{% trans 'Search by title' %}" value="{{ search_form.q.value|default_if_none:'' }}">
+  </div>
+  <div class="form-group">
+    <label for="search-start">{% trans 'From' %}</label>
+    <input type="date" id="search-start" name="start" class="form-control" value="{{ search_form.start.value|default_if_none:'' }}">
+  </div>
+  <div class="form-group">
+    <label for="search-end">{% trans 'To' %}</label>
+    <input type="date" id="search-end" name="end" class="form-control" value="{{ search_form.end.value|default_if_none:'' }}">
+  </div>
+  <button type="submit" class="btn btn-primary">{% trans 'Search' %}</button>
+  <a href="{{ request.path }}" class="btn btn-default">{% trans 'Clear' %}</a>
+</form>
 <table class="table table-striped">
   <tr>
     <th>{% trans 'Title' %}</th>
@@ -52,7 +69,7 @@
 {% if is_paginated %}
 <ul class="pagination">
 {% if page_obj.has_previous %}
-<li><a href="{{ request.path }}?page={{ page_obj.previous_page_number}}"><i class="force-parent-lh fa fa-chevron-left" aria-hidden="true"></i>
+<li><a href="{{ request.path }}?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number}}"><i class="force-parent-lh fa fa-chevron-left" aria-hidden="true"></i>
 </a>
 {% endif %}
 </li>
@@ -72,7 +89,7 @@
   </select>
 </li>
 {% if page_obj.has_next %}
-<li><a href="{{ request.path }}?page={{ page_obj.next_page_number }}"><i class="force-parent-lh fa fa-chevron-right" aria-hidden="true"></i>
+<li><a href="{{ request.path }}?{% if querystring %}{{ querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}"><i class="force-parent-lh fa fa-chevron-right" aria-hidden="true"></i>
 </a></li>
 {% endif %}
 </ul>
@@ -86,7 +103,7 @@
 <script type="text/javascript">
   $('select').change(function() {
     $( "select option:selected" ).each(function() {
-      window.location.href = "{{ request.path }}?page=" + $(this).val();
+      window.location.href = "{{ request.path }}?{% if querystring %}{{ querystring|escapejs }}&{% endif %}page=" + $(this).val();
     });
   })
 </script>
