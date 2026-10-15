@@ -9,6 +9,23 @@ from django.utils.translation import gettext as _
 from .models import Account, AccountType, Split
 
 
+# -----------------------------------------------------------------------------
+# MANUTENÇÃO (Etapa 4) - PROBLEMA 2 IDENTIFICADO: Duplicated Code
+# (identificado e documentado, não refatorado nesta entrega)
+# Local: get_accounts_balance, get_account_balance, _get_balances e
+#   category_spending.
+# Evidência: o mesmo bloco try/except com strptime e a mesma mensagem de erro
+#   ("Invalid date format, expected yyyy-mm-dd") está copiado em 4 funções, e a
+#   string '%Y-%m-%d' aparece 10 vezes neste arquivo.
+# Consequência: mudar o formato da data ou a mensagem de erro exige editar 4
+#   lugares, e é fácil esquecer um (category_spending, por exemplo, mantém
+#   datetime enquanto as outras convertem para date).
+# Tratamento possível: Extract Method (uma função que converte o par de datas e
+#   uma que monta a resposta de erro) e uma constante para o formato.
+# Testes que protegem esse trecho: tests/test_api.py.
+# -----------------------------------------------------------------------------
+
+
 @login_required
 def get_accounts(request, account_type):
     accounts = Account.objects.exclude(account_type=AccountType.SYSTEM)
